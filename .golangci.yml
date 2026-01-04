@@ -1,0 +1,113 @@
+run:
+  timeout: 5m
+
+linters:
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - cyclop
+    - errcheck
+    - errname
+    - errorlint
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - gocheckcompileerrors
+    - gochecknoglobals
+    - gochecknoinits
+    - gocritic
+    - gocyclo
+    - godot
+    - godox
+    - gofmt
+    - gofumpt
+    - goheader
+    - goimports
+    - gomodguard
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - grouper
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - ireturn
+    - lll
+    - loggercheck
+    - misspell
+    - musttag
+    - nakedret
+    - nilnil
+    - nolintlint
+    - nosprintfhostport
+    - prealloc
+    - predeclared
+    - promlinter
+    - protogetter
+    - revive
+    - sloglint
+    - slurp
+    - spancheck
+    - sqlc
+    - staticcheck
+    - stylecheck
+    - tagliatelle
+    - tenv
+    - testableexamples
+    - testpackage
+    - thelper
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+    - wrapcheck
+
+  # Disable some linters that may be too strict for this project
+  disable:
+    - exhaustruct      # Too strict for Go
+    - exhaustive       # Can be verbose
+    - goerr113         # Can be verbose
+    - nlreturn         # Style preference
+    - varnamelen       # Variable naming conventions
+
+linters-settings:
+  goimports:
+    local-prefixes: github.com/vdesjardins/terraform-module-versions
+
+  gocyclo:
+    min-complexity: 15
+
+  cyclop:
+    max-complexity: 15
+    package-average: 10
+
+  lll:
+    line-length: 120
+    tab-width: 4
+
+  govet:
+    enable:
+      - shadow
+      - unusedwrite
+
+issues:
+  exclude-rules:
+    # Exclude test files from some linters
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - goconst
+        - gomnd
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true

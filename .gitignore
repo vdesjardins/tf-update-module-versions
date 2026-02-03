@@ -30,3 +30,6 @@ tf-update-module-versions
 
 # bv (beads viewer) local config and caches
 .bv/
+
+# Pre-commit (generated from flake.nix with prek)
+.pre-commit-config.yaml

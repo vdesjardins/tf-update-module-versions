@@ -1,0 +1,168 @@
+version: 2
+
+project_name: tf-update-module-versions
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: tf-update-module-versions
+    main: ./cmd/tf-update-module-versions
+    binary: tf-update-module-versions
+
+    env:
+      - CGO_ENABLED=0
+
+    goos:
+      - linux
+      - darwin
+      - windows
+
+    goarch:
+      - amd64
+      - arm64
+
+    # Skip build for windows/arm64 (not commonly used)
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+    ldflags:
+      - -s -w
+      - -X main.Version={{.Version}}
+      - -X main.Commit={{.Commit}}
+      - -X main.BuildTime={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64{{ else }}{{ .Arch }}{{ end }}
+
+    # Use zip for Windows
+    format_overrides:
+      - goos: windows
+        format: zip
+
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+signs:
+  - artifacts: checksum
+    args:
+      - "--batch"
+      - "--local-user"
+      - "{{ .Env.GPG_FINGERPRINT }}"
+      - "--output"
+      - "${signature}"
+      - "--detach-sign"
+      - "${artifact}"
+
+changelog:
+  use: github
+  sort: asc
+  abbrev: 0
+
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\(.+\))?!?:.+$'
+      order: 100
+
+    - title: Bug fixes
+      regexp: '^.*?fix(\(.+\))?!?:.+$'
+      order: 200
+
+    - title: Improvements
+      regexp: '^.*?refactor(\(.+\))?!?:.+$'
+      order: 300
+
+    - title: Documentation
+      regexp: '^.*?docs(\(.+\))?!?:.+$'
+      order: 400
+
+    - title: Other changes
+      order: 999
+
+  filters:
+    exclude:
+      - '^chore'
+      - '^test'
+      - '^ci'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: vdesjardins
+    name: tf-update-module-versions
+
+  # Create draft releases (require manual promotion)
+  draft: true
+
+  # Auto-generate release notes from changelog
+  make_latest: true
+
+  footer: |
+    ## Installation
+
+    ### Binary Download
+    Download the appropriate binary for your system from the assets below.
+
+    ### Using Nix
+    ```bash
+    nix run github:vdesjardins/tf-update-module-versions -- show ./terraform
+    ```
+
+    ### Verify Checksums
+    ```bash
+    sha256sum -c checksums.txt
+    ```
+
+    ### Installation Directory
+    Extract and move the binary to your PATH:
+    ```bash
+    mv tf-update-module-versions /usr/local/bin/
+    ```
+
+nfpms:
+  - id: tf-update-module-versions
+    package_name: tf-update-module-versions
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+    homepage: https://github.com/vdesjardins/tf-update-module-versions
+    description: Automated Terraform module version discovery and updates
+    maintainer: Vincent Desjardins
+    license: MIT
+
+    formats:
+      - deb
+      - rpm
+
+    bindir: /usr/bin
+
+brews:
+  - repository:
+      owner: vdesjardins
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+
+    homepage: https://github.com/vdesjardins/tf-update-module-versions
+    description: Automated Terraform module version discovery and updates
+    license: MIT
+
+aurs:
+  - home_url: https://github.com/vdesjardins/tf-update-module-versions
+    description: Automated Terraform module version discovery and updates
+    maintainers:
+      - Vincent Desjardins
+    license: MIT
+    git_url: ssh://aur@aur.archlinux.org/tf-update-module-versions.git

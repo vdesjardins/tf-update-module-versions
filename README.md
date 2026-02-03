@@ -319,6 +319,170 @@ go test -v -run TestComparatorCompare ./internal/version
 
 See the Terraform Registry handler for a concrete example.
 
+## Release Process
+
+This project uses **GoReleaser** for automated releases with multi-platform binary builds, changelog generation, and GitHub release management.
+
+### Creating a Release
+
+1. **Ensure commits follow Conventional Commits format**:
+   - `feat:` for features
+   - `fix:` for bug fixes
+   - `docs:` for documentation
+   - `refactor:` for code improvements
+   - `chore:`, `ci:`, `test:` for maintenance
+
+2. **Create a semantic version tag**:
+   ```bash
+   git tag -a v1.2.3 -m "Release v1.2.3"
+   git push origin v1.2.3
+   ```
+
+3. **GitHub Actions automatically**:
+   - Builds binaries for Linux (amd64, arm64), macOS (amd64, arm64), Windows (amd64)
+   - Generates checksums and creates archives (tar.gz for Unix, zip for Windows)
+   - Creates a **draft release** on GitHub (requires manual promotion)
+   - Generates changelog from conventional commits
+
+### Draft Releases
+
+- Releases are created as **drafts** on GitHub
+- Review the generated changelog and binary assets
+- Click "Publish release" when ready
+
+### Release Artifacts
+
+Each release includes:
+- ✅ Compiled binaries for all platforms
+- ✅ SHA256 checksums (`checksums.txt`)
+- ✅ Source code archives (zip/tar.gz)
+- ✅ Auto-generated changelog from commit history
+- ✅ Installation instructions
+
+### Installation from Release
+
+**Download specific version**:
+```bash
+VERSION=v1.2.3
+wget https://github.com/vdesjardins/tf-update-module-versions/releases/download/$VERSION/tf-update-module-versions_Linux_x86_64.tar.gz
+tar xzf tf-update-module-versions_Linux_x86_64.tar.gz
+sudo mv tf-update-module-versions /usr/local/bin/
+```
+
+**Verify checksums**:
+```bash
+sha256sum -c checksums.txt
+```
+
+### Configuration Files
+
+- `.goreleaser.yaml` - GoReleaser configuration for builds and release management
+- `.github/workflows/release.yml` - GitHub Actions workflow triggered on version tags
+- `.github/workflows/conventional-commits.yml` - PR title validation for semantic commits
+
+## CI/CD Pipeline
+
+[![CI](https://github.com/vdesjardins/tf-update-module-versions/actions/workflows/ci.yml/badge.svg)](https://github.com/vdesjardins/tf-update-module-versions/actions/workflows/ci.yml)
+
+This project includes a comprehensive CI/CD pipeline to ensure code quality and reliability.
+
+### Nix-Based CI Approach
+
+The CI pipeline uses **Nix for dependency management** instead of individual GitHub Actions, ensuring consistency between local development and CI/CD environments:
+
+- ✅ **Single Source of Truth**: All dependencies defined in `flake.nix`
+- ✅ **Environment Consistency**: Local dev environment = GitHub Actions CI
+- ✅ **Simplified Workflow**: Let Nix handle Go, golangci-lint, and tool versions
+- ✅ **Automatic Caching**: Nix manages build caching efficiently
+- ✅ **Cleaner Configuration**: Fewer workflow actions, more readable
+
+### Automated Checks
+
+Every push to `main`/`develop` and every pull request automatically triggers a single CI job that runs:
+
+1. **Test Suite** - Runs all unit tests with coverage
+   ```bash
+   go test -v -race -coverprofile=coverage.out ./...
+   ```
+   - Full race condition detection
+   - Code coverage reporting
+   - Coverage uploaded to Codecov
+
+2. **Lint Check** - Validates code style and quality
+   ```bash
+   golangci-lint run ./...
+   ```
+   - Enforces project code standards
+   - Issues reported as PR annotations
+
+3. **Build Verification** - Confirms binary compilation
+   ```bash
+   make build
+   ```
+   - Verifies binary builds successfully
+   - Binary artifact preserved for inspection (5 days)
+
+All three checks run sequentially in the same Nix shell environment (~12-15 minutes total).
+
+### Workflow Files
+
+- `.github/workflows/ci.yml` - Main CI pipeline (test, lint, build with Nix)
+- `.github/workflows/release.yml` - Release workflow (on version tags)
+- `.github/workflows/conventional-commits.yml` - Commit validation
+
+### Branch Protection
+
+The `main` branch has protection rules requiring:
+- ✅ All CI checks must pass
+- ✅ PR review approval
+- ✅ Up-to-date with main branch
+- ✅ Conventional commit compliance
+
+### Performance
+
+- **Unified Execution**: All checks in single Nix shell (~12-15 minutes total)
+- **Nix Caching**: Automatic caching of build artifacts and dependencies
+- **Artifacts**: Binary preserved for 5 days for inspection and verification
+
+### How the CI Works
+
+```mermaid
+graph LR
+    A[Push/PR] --> B[Checkout code]
+    B --> C[Install Nix]
+    C --> D[nix develop]
+    D --> E[Run in Nix shell]
+    E --> F[Test]
+    F --> G[Lint]
+    G --> H[Build]
+    H --> I{Pass?}
+    I -->|Yes| J[✅ CI Passed]
+    I -->|No| K[❌ CI Failed]
+```
+
+### Local CI Testing
+
+To test the workflow locally before pushing, simply run:
+
+```bash
+# Enter Nix development environment
+nix develop
+
+# Run all checks (same as CI)
+make test
+make lint
+make build
+```
+
+Or run all at once:
+```bash
+nix develop --command bash -c 'make test && make lint && make build'
+```
+
+### Workflow Status
+
+Check the status of all workflows: https://github.com/vdesjardins/tf-update-module-versions/actions
+
 ## License
 
 This project was developed as an experiment in Terraform tooling automation.

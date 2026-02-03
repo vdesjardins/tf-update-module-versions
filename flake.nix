@@ -4,9 +4,12 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    pre-commit-hooks.url = "github:cachix/pre-commit-hooks.nix";
+    pre-commit-hooks.inputs.nixpkgs.follows = "nixpkgs";
+    pre-commit-hooks.inputs.flake-utils.follows = "flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks }:
     flake-utils.lib.eachDefaultSystem (
       system: let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -41,6 +44,21 @@
           };
         };
 
+        checks = {
+          pre-commit-check = pre-commit-hooks.lib.${system}.run {
+            src = self;
+            package = pkgs.prek;
+            hooks = {
+              trim-trailing-whitespace = {
+                enable = true;
+                excludes = ["\\.(md)$"];
+              };
+              end-of-file-fixer.enable = true;
+              check-yaml.enable = true;
+            };
+          };
+        };
+
         devShells.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             # Go compiler
@@ -50,9 +68,11 @@
             golangci-lint
             gnumake
             git
+            prek
           ];
 
           shellHook = ''
+            ${self.checks.${system}.pre-commit-check.shellHook}
             echo "terraform-module-versions development environment loaded"
             echo "Available commands: make build, make test, make lint, make fmt, make clean"
             echo "Run 'make help' for more information"

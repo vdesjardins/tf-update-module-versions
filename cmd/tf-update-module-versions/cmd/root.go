@@ -8,6 +8,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/vdesjardins/terraform-module-versions/internal/cache"
+	"github.com/vdesjardins/terraform-module-versions/internal/color"
 )
 
 var (
@@ -18,6 +19,7 @@ var (
 	cacheTTL   = 24 * time.Hour
 	cacheClear = false
 	cacheStore cache.Store
+	output     *color.ColoredOutput
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -26,6 +28,9 @@ var rootCmd = &cobra.Command{
 	Short: "Manage Terraform module versions",
 	Long:  "A tool to manage Terraform module versions",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Initialize colored output
+		output = color.New()
+
 		// Initialize cache if cache operations are needed
 		if cacheDir == "" {
 			// Default to ~/.cache/terraform-module-versions
@@ -51,7 +56,7 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("failed to clear cache: %w", err)
 			}
 			diskStore.Close()
-			fmt.Fprintf(os.Stderr, "Cache cleared\n")
+			output.Fprintf(os.Stderr, color.Green, "Cache cleared\n")
 		}
 
 		// Initialize the global cache store
@@ -75,7 +80,11 @@ var rootCmd = &cobra.Command{
 // Execute runs the root command
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		// Initialize output if not already done (for early errors)
+		if output == nil {
+			output = color.New()
+		}
+		output.Fprintf(os.Stderr, color.BoldRed, "%s\n", err)
 		os.Exit(1)
 	}
 }

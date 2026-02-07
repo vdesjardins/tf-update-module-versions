@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/vdesjardins/terraform-module-versions/internal/color"
 	"github.com/vdesjardins/terraform-module-versions/internal/filter"
 	"github.com/vdesjardins/terraform-module-versions/internal/finder"
 	"github.com/vdesjardins/terraform-module-versions/internal/registry"
@@ -67,7 +68,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 	// Display applied constraints if any
 	if len(constraints) > 0 {
-		fmt.Fprintf(os.Stderr, "Applied constraints: %v\n", constraints)
+		output.Fprintf(os.Stderr, color.Cyan, "Applied constraints: %v\n", constraints)
 	}
 
 	// Build module filter
@@ -77,7 +78,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Find all modules with versions
-	fmt.Fprintf(os.Stderr, "Finding modules in %s...\n", dirPath)
+	output.Fprintf(os.Stderr, color.Blue, "Finding modules in %s...\n", dirPath)
 	usages, err := finder.FindModulesWithVersions(dirPath, moduleFilter)
 	if err != nil {
 		return fmt.Errorf("failed to find modules: %w", err)
@@ -88,10 +89,10 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "Found %d module invocations\n", len(usages))
+	output.Fprintf(os.Stderr, color.Green, "Found %d module invocations\n", len(usages))
 
 	// Analyze sources
-	fmt.Fprintf(os.Stderr, "Analyzing module sources...\n")
+	output.Fprintf(os.Stderr, color.Blue, "Analyzing module sources...\n")
 	resolver := source.NewResolver()
 	sources := make(map[string]*source.Source)
 	supportedSources := []*source.Source{}
@@ -100,7 +101,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		if _, exists := sources[usage.Usage.Source]; !exists {
 			src, err := resolver.Resolve(usage.Usage.Source)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to parse source %s: %v\n", usage.Usage.Source, err)
+				output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to parse source %s: %v\n", usage.Usage.Source, err)
 				continue
 			}
 			sources[usage.Usage.Source] = src
@@ -112,7 +113,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch latest versions
-	fmt.Fprintf(os.Stderr, "Fetching latest versions from registries...\n")
+	output.Fprintf(os.Stderr, color.Blue, "Fetching latest versions from registries...\n")
 	var fetcher *registry.VersionFetcher
 	if cacheStore != nil {
 		// Use version fetcher with cache
@@ -136,7 +137,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	printer.Print()
 
 	// Actually perform updates
-	fmt.Fprintf(os.Stderr, "\nApplying updates...\n")
+	output.Fprintf(os.Stderr, color.Blue, "\nApplying updates...\n")
 	fileUpdater := updater.NewFileUpdater()
 
 	updatesApplied := 0
@@ -172,7 +173,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 						constraints,
 					)
 					if err != nil {
-						fmt.Fprintf(os.Stderr, "Warning: could not select version for %s: %v\n", mod.Source, err)
+						output.Fprintf(os.Stderr, color.BoldYellow, "Warning: could not select version for %s: %v\n", mod.Source, err)
 						continue
 					}
 					targetVersion = selectedVersion
@@ -188,12 +189,12 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 
 			updates, err := fileUpdater.UpdateDirectory(dirPath, mod.Source, currentVer, targetVersion)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed to update %s: %v\n", mod.Source, err)
+				output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to update %s: %v\n", mod.Source, err)
 				continue
 			}
 
 			for file, count := range updates {
-				fmt.Printf("✓ %s: %s %s → %s (%d changes)\n", file, mod.Source, currentVer, targetVersion, count)
+				fmt.Printf("%s✓ %s: %s %s → %s (%d changes)%s\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count, "\033[0m")
 				updatesApplied += count
 			}
 		}

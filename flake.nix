@@ -55,6 +55,14 @@
               };
               end-of-file-fixer.enable = true;
               check-yaml.enable = true;
+              actionlint = {
+                enable = true;
+                description = "Validate GitHub Actions workflows with actionlint";
+                entry = "${pkgs.actionlint}/bin/actionlint";
+                files = "^.github/workflows/.*\\.ya?ml$";
+                language = "system";
+                types = ["yaml"];
+              };
             };
           };
         };

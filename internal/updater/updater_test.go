@@ -74,6 +74,91 @@ func TestFileUpdater(t *testing.T) {
 	}
 }
 
+func TestFileUpdaterCount(t *testing.T) {
+	// Create temp dir with a .tf file
+	tmpDir, err := os.MkdirTemp("", "test-updater-count-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Create a test .tf file
+	tfFile := filepath.Join(tmpDir, "main.tf")
+	content := []byte(`module "example" {
+  source  = "hashicorp/vault/aws"
+  version = "0.1.0"
+}`)
+
+	if err := os.WriteFile(tfFile, content, 0644); err != nil {
+		t.Fatalf("failed to write test file: %v", err)
+	}
+
+	updater := NewFileUpdater()
+	count, err := updater.Count(tfFile, "hashicorp/vault/aws", "0.1.0")
+	if err != nil {
+		t.Fatalf("Count() error = %v", err)
+	}
+
+	if count != 1 {
+		t.Errorf("Count() = %d matches, want 1", count)
+	}
+
+	// Verify file was not updated
+	updatedContent, err := os.ReadFile(tfFile)
+	if err != nil {
+		t.Fatalf("failed to read file: %v", err)
+	}
+
+	if string(updatedContent) != string(content) {
+		t.Error("Count() should not modify file contents")
+	}
+}
+
+func TestFileUpdaterCountDirectory(t *testing.T) {
+	// Create temp dir with .tf files
+	tmpDir, err := os.MkdirTemp("", "test-updater-count-dir-*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	first := filepath.Join(tmpDir, "main.tf")
+	second := filepath.Join(tmpDir, "modules.tf")
+	ignored := filepath.Join(tmpDir, "README.md")
+
+	if err := os.WriteFile(first, []byte(`module "example" {
+  source  = "hashicorp/vault/aws"
+  version = "0.1.0"
+}`), 0644); err != nil {
+		t.Fatalf("failed to write first file: %v", err)
+	}
+
+	if err := os.WriteFile(second, []byte(`module "another" {
+  source  = "hashicorp/vault/aws"
+  version = "0.1.0"
+}`), 0644); err != nil {
+		t.Fatalf("failed to write second file: %v", err)
+	}
+
+	if err := os.WriteFile(ignored, []byte("not terraform"), 0644); err != nil {
+		t.Fatalf("failed to write ignored file: %v", err)
+	}
+
+	updater := NewFileUpdater()
+	results, err := updater.CountDirectory(tmpDir, "hashicorp/vault/aws", "0.1.0")
+	if err != nil {
+		t.Fatalf("CountDirectory() error = %v", err)
+	}
+
+	if len(results) != 2 {
+		t.Fatalf("CountDirectory() returned %d files, want 2", len(results))
+	}
+
+	if results[first] != 1 || results[second] != 1 {
+		t.Errorf("CountDirectory() results = %v, want 1 per file", results)
+	}
+}
+
 func TestIsTerraformFile(t *testing.T) {
 	tests := []struct {
 		path     string

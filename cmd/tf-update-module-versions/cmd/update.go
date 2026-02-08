@@ -22,6 +22,7 @@ var (
 	globalVersion        string
 	updateConstraint     string
 	updateConstraintFile string
+	dryRun               bool
 )
 
 // updateCmd represents the update command
@@ -137,7 +138,11 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	printer.Print()
 
 	// Actually perform updates
-	output.Fprintf(os.Stderr, color.Blue, "\nApplying updates...\n")
+	if dryRun {
+		output.Fprintf(os.Stderr, color.Blue, "\nDry-run: planned updates...\n")
+	} else {
+		output.Fprintf(os.Stderr, color.Blue, "\nApplying updates...\n")
+	}
 	fileUpdater := updater.NewFileUpdater()
 
 	updatesApplied := 0
@@ -187,21 +192,37 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
-			updates, err := fileUpdater.UpdateDirectory(dirPath, mod.Source, currentVer, targetVersion)
+			var updates map[string]int
+			var err error
+			if dryRun {
+				updates, err = fileUpdater.CountDirectory(dirPath, mod.Source, currentVer)
+			} else {
+				updates, err = fileUpdater.UpdateDirectory(dirPath, mod.Source, currentVer, targetVersion)
+			}
 			if err != nil {
 				output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to update %s: %v\n", mod.Source, err)
 				continue
 			}
 
 			for file, count := range updates {
-				fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count)
+				if dryRun {
+					fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Info("•"), file, mod.Source, currentVer, targetVersion, count)
+				} else {
+					fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count)
+				}
 				updatesApplied += count
 			}
 		}
 	}
 
-	fmt.Printf("\nFiles Updated: %s\n", output.Status("%d", updatesApplied))
-	fmt.Printf("Total Changes: %s\n\n", output.Status("%d", updatesApplied))
+	if dryRun {
+		fmt.Printf("\nDry-run: planned updates\n")
+		fmt.Printf("Files Planned: %s\n", output.Status("%d", updatesApplied))
+		fmt.Printf("Total Planned Changes: %s\n\n", output.Status("%d", updatesApplied))
+	} else {
+		fmt.Printf("\nFiles Updated: %s\n", output.Status("%d", updatesApplied))
+		fmt.Printf("Total Changes: %s\n\n", output.Status("%d", updatesApplied))
+	}
 
 	return nil
 }
@@ -274,4 +295,6 @@ Example: --constraint ">=1.2.3"`)
 	flags.StringVar(&updateConstraintFile, "constraint-file", "",
 		`Path to file containing version constraints (one per line).
 Mutually exclusive with --constraint`)
+
+	flags.BoolVarP(&dryRun, "dry-run", "n", false, "Show planned updates without writing files")
 }

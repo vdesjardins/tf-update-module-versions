@@ -96,7 +96,7 @@ func init() {
 	rootCmd.PersistentFlags().BoolVar(&cacheClear, "cache-clear", false, "Clear the cache before running")
 
 	cobra.AddTemplateFunc("heading", func(text string) string {
-		return color.New().Sprintf(color.BoldCyan, text)
+		return color.New().Sprintf(color.BoldCyan, "%s", text)
 	})
 
 	rootCmd.SetHelpTemplate(`{{with (or .Long .Short)}}{{.}}

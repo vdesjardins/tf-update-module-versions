@@ -54,6 +54,18 @@ func (u *FileUpdater) Update(filePath, source, oldVersion, newVersion string) (i
 	return countBefore, nil
 }
 
+// Count counts occurrences of a module source+version in a file without updating it
+// Returns the number of matches found
+func (u *FileUpdater) Count(filePath, source, oldVersion string) (int, error) {
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+
+	contentStr := string(content)
+	return countOccurrences(contentStr, source, oldVersion), nil
+}
+
 // UpdateDirectory updates all .tf files in a directory tree
 // Returns a map of file paths to number of replacements made
 func (u *FileUpdater) UpdateDirectory(dirPath, source, oldVersion, newVersion string) (map[string]int, error) {
@@ -78,6 +90,40 @@ func (u *FileUpdater) UpdateDirectory(dirPath, source, oldVersion, newVersion st
 		if err != nil {
 			// Log error but continue processing other files
 			fmt.Fprintf(os.Stderr, "Error updating %s: %v\n", path, err)
+			return nil
+		}
+
+		if count > 0 {
+			results[path] = count
+		}
+
+		return nil
+	})
+
+	return results, err
+}
+
+// CountDirectory counts matches in all .tf files in a directory tree without updating
+// Returns a map of file paths to number of matches found
+func (u *FileUpdater) CountDirectory(dirPath, source, oldVersion string) (map[string]int, error) {
+	results := make(map[string]int)
+
+	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if !isTerraformFile(path) {
+			return nil
+		}
+
+		count, err := u.Count(path, source, oldVersion)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error scanning %s: %v\n", path, err)
 			return nil
 		}
 

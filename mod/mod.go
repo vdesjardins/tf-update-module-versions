@@ -68,6 +68,18 @@ func FindModules(root string) ([]ModuleInfo, error) {
 	return mods, err
 }
 
+// UpstreamVersions fetches versions for a module source after validating format
+func UpstreamVersions(source string) (*RegistryModule, error) {
+	modulePaths := strings.Split(source, "//")
+	parts := strings.Split(modulePaths[0], "/")
+
+	if len(parts) != 3 && len(parts) != 4 {
+		return nil, fmt.Errorf("unsupported module source: %s", source)
+	}
+
+	return UpstreamModule(source)
+}
+
 func UpstreamModule(source string) (*RegistryModule, error) {
 	host := ""
 

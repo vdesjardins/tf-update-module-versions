@@ -5,35 +5,38 @@ import (
 	"os"
 	"sort"
 	"strings"
+
+	"github.com/vdesjardins/terraform-module-versions/internal/color"
 )
 
 // Printer handles output to console
 type Printer struct {
 	summary *UpdateSummary
+	color   *color.ColoredOutput
 }
 
 // NewPrinter creates a new report printer
 func NewPrinter(summary *UpdateSummary) *Printer {
-	return &Printer{summary: summary}
+	return &Printer{summary: summary, color: color.New()}
 }
 
 // Print outputs the summary to console
 func (p *Printer) Print() {
-	fmt.Println("\n╔════════════════════════════════════════════════════════════╗")
-	fmt.Println("║  Terraform Module Update Summary")
-	fmt.Println("╚════════════════════════════════════════════════════════════╝")
+	fmt.Println(p.color.Sprintf(color.BoldCyan, "\n╔════════════════════════════════════════════════════════════╗"))
+	fmt.Println(p.color.Sprintf(color.BoldCyan, "║  Terraform Module Update Summary                           ║"))
+	fmt.Println(p.color.Sprintf(color.BoldCyan, "╚════════════════════════════════════════════════════════════╝"))
 
 	// Overview
-	fmt.Println("\nModule Status Overview")
-	fmt.Println("─────────────────────")
+	fmt.Println(p.color.Sprintf(color.BoldBlue, "\nModule Status Overview"))
+	fmt.Println(p.color.Sprintf(color.Blue, "─────────────────────"))
 	fmt.Printf("  Supported Modules:        %d\n", p.summary.SuportedCount)
 	fmt.Printf("  Unsupported Modules:      %d\n", p.summary.UnsupportedCount)
 	fmt.Printf("  Total Module Usages:      %d\n", p.summary.TotalUsages)
 
 	// Detailed reports for supported modules
 	if len(p.summary.Modules) > 0 {
-		fmt.Println("Supported Modules")
-		fmt.Println("─────────────────")
+		fmt.Println(p.color.Sprintf(color.BoldBlue, "Supported Modules"))
+		fmt.Println(p.color.Sprintf(color.Blue, "─────────────────"))
 		for _, mod := range p.summary.Modules {
 			p.printModuleReport(&mod)
 		}
@@ -41,27 +44,27 @@ func (p *Printer) Print() {
 
 	// Unsupported modules
 	if len(p.summary.UnsupportedModules) > 0 {
-		fmt.Println("Unsupported Modules")
-		fmt.Println("───────────────────")
+		fmt.Println(p.color.Sprintf(color.BoldYellow, "Unsupported Modules"))
+		fmt.Println(p.color.Sprintf(color.Yellow, "───────────────────"))
 		for _, unsup := range p.summary.UnsupportedModules {
-			fmt.Printf("\n✗ %s (%s)\n", unsup.Source, unsup.Type.String())
+			fmt.Printf("\n%s\n", p.color.Error("✗ %s (%s)", unsup.Source, unsup.Type.String()))
 			fmt.Printf("  Total Usages: %d\n", unsup.Count)
-			fmt.Println("  Status:       NOT SUPPORTED (future enhancement)")
+			fmt.Printf("  Status:       %s\n", p.color.Warning("NOT SUPPORTED (future enhancement)"))
 		}
 		fmt.Println()
 	}
 
 	// Summary stats
-	fmt.Println("Summary")
-	fmt.Println("───────")
+	fmt.Println(p.color.Sprintf(color.BoldBlue, "Summary"))
+	fmt.Println(p.color.Sprintf(color.Blue, "───────"))
 	fmt.Printf("  Total Module Invocations:           %d\n", p.summary.TotalUsages)
 	fmt.Printf("  Module Invocations to Update:       %d\n", p.summary.TotalUpdated)
 	fmt.Printf("  Module Invocations Already Latest:  %d\n", p.summary.TotalUsages-p.summary.TotalUpdated)
 
 	// Version change details
 	if len(p.summary.ByVersionChange) > 0 {
-		fmt.Println("\nVersion Changes Summary")
-		fmt.Println("──────────────────────")
+		fmt.Println(p.color.Sprintf(color.BoldBlue, "\nVersion Changes Summary"))
+		fmt.Println(p.color.Sprintf(color.Blue, "──────────────────────"))
 
 		// Sort keys for consistent output
 		var keys []string
@@ -72,7 +75,7 @@ func (p *Printer) Print() {
 
 		for _, key := range keys {
 			count := p.summary.ByVersionChange[key]
-			fmt.Printf("  %s (%d changes)\n", key, count)
+			fmt.Printf("  %s (%d changes)\n", p.color.Info("%s", key), count)
 		}
 	}
 
@@ -80,7 +83,7 @@ func (p *Printer) Print() {
 }
 
 func (p *Printer) printModuleReport(mod *ModuleReport) {
-	fmt.Printf("\n✓ %s (%s)\n", mod.Source, mod.Type.String())
+	fmt.Printf("\n%s\n", p.color.Success("✓ %s (%s)", mod.Source, mod.Type.String()))
 
 	// Current versions
 	fmt.Print("  Current Versions:  ")
@@ -91,13 +94,13 @@ func (p *Printer) printModuleReport(mod *ModuleReport) {
 	sort.Strings(versionLines)
 	fmt.Println(strings.Join(versionLines, ", "))
 
-	fmt.Printf("  Latest Version:    %s\n", mod.LatestVersion)
-	fmt.Printf("  Modules to Update: %d\n", mod.UpdateCount)
+	fmt.Printf("  Latest Version:    %s\n", p.color.Info("%s", mod.LatestVersion))
+	fmt.Printf("  Modules to Update: %s\n", p.color.Status("%d", mod.UpdateCount))
 
 	if mod.UpdateCount > 0 {
-		fmt.Printf("  Status:            UPDATE AVAILABLE\n")
+		fmt.Printf("  Status:            %s\n", p.color.Warning("UPDATE AVAILABLE"))
 	} else {
-		fmt.Printf("  Status:            ALREADY AT LATEST\n")
+		fmt.Printf("  Status:            %s\n", p.color.Success("ALREADY AT LATEST"))
 	}
 
 	// Locations (if tracking was enabled)
@@ -113,10 +116,12 @@ func (p *Printer) printModuleReport(mod *ModuleReport) {
 
 // PrintError prints an error message
 func PrintError(message string) {
-	fmt.Fprintf(os.Stderr, "\n❌ Error: %s\n\n", message)
+	colored := color.New()
+	fmt.Fprintf(os.Stderr, "\n%s\n\n", colored.Error("❌ Error: %s", message))
 }
 
 // PrintSuccess prints a success message
 func PrintSuccess(message string) {
-	fmt.Printf("\n✅ %s\n\n", message)
+	colored := color.New()
+	fmt.Printf("\n%s\n\n", colored.Success("✅ %s", message))
 }

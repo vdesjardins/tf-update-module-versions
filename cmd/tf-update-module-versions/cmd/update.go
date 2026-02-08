@@ -85,7 +85,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	if len(usages) == 0 {
-		fmt.Println("No modules with version constraints found.")
+		fmt.Printf("%s\n", output.Warning("No modules with version constraints found."))
 		return nil
 	}
 
@@ -194,14 +194,14 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 			}
 
 			for file, count := range updates {
-				fmt.Printf("%s✓ %s: %s %s → %s (%d changes)%s\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count, "\033[0m")
+				fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count)
 				updatesApplied += count
 			}
 		}
 	}
 
-	fmt.Printf("\nFiles Updated: %d\n", updatesApplied)
-	fmt.Printf("Total Changes: %d\n\n", updatesApplied)
+	fmt.Printf("\nFiles Updated: %s\n", output.Status("%d", updatesApplied))
+	fmt.Printf("Total Changes: %s\n\n", output.Status("%d", updatesApplied))
 
 	return nil
 }

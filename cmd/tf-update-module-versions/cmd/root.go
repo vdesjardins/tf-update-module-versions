@@ -94,6 +94,44 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cacheDir, "cache-dir", "", "Directory for cache storage (default: $HOME/.cache/terraform-module-versions)")
 	rootCmd.PersistentFlags().DurationVar(&cacheTTL, "cache-ttl", 24*time.Hour, "Cache entry TTL (e.g., 24h, 1h30m)")
 	rootCmd.PersistentFlags().BoolVar(&cacheClear, "cache-clear", false, "Clear the cache before running")
+
+	cobra.AddTemplateFunc("heading", func(text string) string {
+		return color.New().Sprintf(color.BoldCyan, text)
+	})
+
+	rootCmd.SetHelpTemplate(`{{with (or .Long .Short)}}{{.}}
+
+{{end}}{{heading "Usage"}}{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if gt (len .Aliases) 0}}
+
+{{heading "Aliases"}}
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+{{heading "Examples"}}
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+{{heading "Available Commands"}}
+{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}  {{rpad .Name .NamePadding }} {{.Short}}
+{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+{{heading "Flags"}}
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+{{heading "Global Flags"}}
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}
+`)
+
+	rootCmd.SetUsageTemplate(`{{heading "Usage"}}{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  {{.CommandPath}} [command]{{end}}{{if .HasAvailableLocalFlags}}
+
+{{heading "Flags"}}
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+{{heading "Global Flags"}}
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}
+`)
 }
 
 // SetVersion allows setting the version at runtime

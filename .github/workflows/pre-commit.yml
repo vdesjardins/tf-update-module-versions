@@ -7,7 +7,7 @@ on:
       - develop
   pull_request:
     branches:
-      - '**'
+      - "**"
   workflow_dispatch:
 
 permissions:
@@ -32,5 +32,5 @@ jobs:
         run: |
           nix develop --command bash -c '
             echo "=== Running pre-commit checks ==="
-            pre-commit run --all-files
+            prek run --all-files
           '

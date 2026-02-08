@@ -2,6 +2,7 @@ package report
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -20,51 +21,55 @@ func NewPrinter(summary *UpdateSummary) *Printer {
 	return &Printer{summary: summary, color: color.New()}
 }
 
-// Print outputs the summary to console
-func (p *Printer) Print() {
-	fmt.Println(p.color.Sprintf(color.BoldCyan, "\n╔════════════════════════════════════════════════════════════╗"))
-	fmt.Println(p.color.Sprintf(color.BoldCyan, "║  Terraform Module Update Summary                           ║"))
-	fmt.Println(p.color.Sprintf(color.BoldCyan, "╚════════════════════════════════════════════════════════════╝"))
+// Print outputs the summary to the provided writer.
+func (p *Printer) Print(writer io.Writer) {
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	fmt.Fprintln(writer, p.color.Sprintf(color.BoldCyan, "\n╔════════════════════════════════════════════════════════════╗"))
+	fmt.Fprintln(writer, p.color.Sprintf(color.BoldCyan, "║  Terraform Module Update Summary                           ║"))
+	fmt.Fprintln(writer, p.color.Sprintf(color.BoldCyan, "╚════════════════════════════════════════════════════════════╝"))
 
 	// Overview
-	fmt.Println(p.color.Sprintf(color.BoldBlue, "\nModule Status Overview"))
-	fmt.Println(p.color.Sprintf(color.Blue, "─────────────────────"))
-	fmt.Printf("  Supported Modules:        %d\n", p.summary.SuportedCount)
-	fmt.Printf("  Unsupported Modules:      %d\n", p.summary.UnsupportedCount)
-	fmt.Printf("  Total Module Usages:      %d\n", p.summary.TotalUsages)
+	fmt.Fprintln(writer, p.color.Sprintf(color.BoldBlue, "\nModule Status Overview"))
+	fmt.Fprintln(writer, p.color.Sprintf(color.Blue, "─────────────────────"))
+	fmt.Fprintf(writer, "  Supported Modules:        %d\n", p.summary.SuportedCount)
+	fmt.Fprintf(writer, "  Unsupported Modules:      %d\n", p.summary.UnsupportedCount)
+	fmt.Fprintf(writer, "  Total Module Usages:      %d\n", p.summary.TotalUsages)
 
 	// Detailed reports for supported modules
 	if len(p.summary.Modules) > 0 {
-		fmt.Println(p.color.Sprintf(color.BoldBlue, "\nSupported Modules"))
-		fmt.Println(p.color.Sprintf(color.Blue, "─────────────────"))
+		fmt.Fprintln(writer, p.color.Sprintf(color.BoldBlue, "\nSupported Modules"))
+		fmt.Fprintln(writer, p.color.Sprintf(color.Blue, "─────────────────"))
 		for _, mod := range p.summary.Modules {
-			p.printModuleReport(&mod)
+			p.printModuleReport(writer, &mod)
 		}
 	}
 
 	// Unsupported modules
 	if len(p.summary.UnsupportedModules) > 0 {
-		fmt.Println(p.color.Sprintf(color.BoldYellow, "\nUnsupported Modules"))
-		fmt.Println(p.color.Sprintf(color.Yellow, "───────────────────"))
+		fmt.Fprintln(writer, p.color.Sprintf(color.BoldYellow, "\nUnsupported Modules"))
+		fmt.Fprintln(writer, p.color.Sprintf(color.Yellow, "───────────────────"))
 		for _, unsup := range p.summary.UnsupportedModules {
-			fmt.Printf("\n%s\n", p.color.Error("✗ %s (%s)", unsup.Source, unsup.Type.String()))
-			fmt.Printf("  Total Usages: %d\n", unsup.Count)
-			fmt.Printf("  Status:       %s\n", p.color.Warning("NOT SUPPORTED (future enhancement)"))
+			fmt.Fprintf(writer, "\n%s\n", p.color.Error("✗ %s (%s)", unsup.Source, unsup.Type.String()))
+			fmt.Fprintf(writer, "  Total Usages: %d\n", unsup.Count)
+			fmt.Fprintf(writer, "  Status:       %s\n", p.color.Warning("NOT SUPPORTED (future enhancement)"))
 		}
-		fmt.Println()
+		fmt.Fprintln(writer)
 	}
 
 	// Summary stats
-	fmt.Println(p.color.Sprintf(color.BoldBlue, "\nSummary"))
-	fmt.Println(p.color.Sprintf(color.Blue, "───────"))
-	fmt.Printf("  Total Module Invocations:           %d\n", p.summary.TotalUsages)
-	fmt.Printf("  Module Invocations to Update:       %d\n", p.summary.TotalUpdated)
-	fmt.Printf("  Module Invocations Already Latest:  %d\n", p.summary.TotalUsages-p.summary.TotalUpdated)
+	fmt.Fprintln(writer, p.color.Sprintf(color.BoldBlue, "\nSummary"))
+	fmt.Fprintln(writer, p.color.Sprintf(color.Blue, "───────"))
+	fmt.Fprintf(writer, "  Total Module Invocations:           %d\n", p.summary.TotalUsages)
+	fmt.Fprintf(writer, "  Module Invocations to Update:       %d\n", p.summary.TotalUpdated)
+	fmt.Fprintf(writer, "  Module Invocations Already Latest:  %d\n", p.summary.TotalUsages-p.summary.TotalUpdated)
 
 	// Version change details
 	if len(p.summary.ByVersionChange) > 0 {
-		fmt.Println(p.color.Sprintf(color.BoldBlue, "\nVersion Changes Summary"))
-		fmt.Println(p.color.Sprintf(color.Blue, "──────────────────────"))
+		fmt.Fprintln(writer, p.color.Sprintf(color.BoldBlue, "\nVersion Changes Summary"))
+		fmt.Fprintln(writer, p.color.Sprintf(color.Blue, "──────────────────────"))
 
 		// Sort keys for consistent output
 		var keys []string
@@ -75,42 +80,42 @@ func (p *Printer) Print() {
 
 		for _, key := range keys {
 			count := p.summary.ByVersionChange[key]
-			fmt.Printf("  %s (%d changes)\n", p.color.Info("%s", key), count)
+			fmt.Fprintf(writer, "  %s (%d changes)\n", p.color.Info("%s", key), count)
 		}
 	}
 
-	fmt.Println()
+	fmt.Fprintln(writer)
 }
 
-func (p *Printer) printModuleReport(mod *ModuleReport) {
-	fmt.Printf("\n%s\n", p.color.Success("✓ %s (%s)", mod.Source, mod.Type.String()))
+func (p *Printer) printModuleReport(writer io.Writer, mod *ModuleReport) {
+	fmt.Fprintf(writer, "\n%s\n", p.color.Success("✓ %s (%s)", mod.Source, mod.Type.String()))
 
 	// Current versions
-	fmt.Print("  Current Versions:  ")
+	fmt.Fprint(writer, "  Current Versions:  ")
 	var versionLines []string
 	for v, count := range mod.CurrentVersions {
 		versionLines = append(versionLines, fmt.Sprintf("%s (%d)", v, count))
 	}
 	sort.Strings(versionLines)
-	fmt.Println(strings.Join(versionLines, ", "))
+	fmt.Fprintln(writer, strings.Join(versionLines, ", "))
 
-	fmt.Printf("  Latest Version:    %s\n", p.color.Info("%s", mod.LatestVersion))
-	fmt.Printf("  Modules to Update: %s\n", p.color.Status("%d", mod.UpdateCount))
+	fmt.Fprintf(writer, "  Latest Version:    %s\n", p.color.Info("%s", mod.LatestVersion))
+	fmt.Fprintf(writer, "  Modules to Update: %s\n", p.color.Status("%d", mod.UpdateCount))
 
 	if mod.UpdateCount > 0 {
-		fmt.Printf("  Status:            %s\n", p.color.Warning("UPDATE AVAILABLE"))
+		fmt.Fprintf(writer, "  Status:            %s\n", p.color.Warning("UPDATE AVAILABLE"))
 	} else {
-		fmt.Printf("  Status:            %s\n", p.color.Success("ALREADY AT LATEST"))
+		fmt.Fprintf(writer, "  Status:            %s\n", p.color.Success("ALREADY AT LATEST"))
 	}
 
 	// Locations (if tracking was enabled)
 	if len(mod.Locations) > 0 && len(mod.Locations) <= 5 {
-		fmt.Println("  Files:")
+		fmt.Fprintln(writer, "  Files:")
 		for _, loc := range mod.Locations {
-			fmt.Printf("    - %s\n", loc)
+			fmt.Fprintf(writer, "    - %s\n", loc)
 		}
 	} else if len(mod.Locations) > 5 {
-		fmt.Printf("  Files: %d files (...)\n", len(mod.Locations))
+		fmt.Fprintf(writer, "  Files: %d files (...)\n", len(mod.Locations))
 	}
 }
 

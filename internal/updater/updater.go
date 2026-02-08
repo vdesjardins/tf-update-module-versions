@@ -2,10 +2,13 @@ package updater
 
 import (
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/vdesjardins/terraform-module-versions/internal/report"
 )
 
 // FileUpdater handles updating .tf files with new module versions
@@ -54,6 +57,58 @@ func (u *FileUpdater) Update(filePath, source, oldVersion, newVersion string) (i
 	return countBefore, nil
 }
 
+// WriteDiff outputs a unified diff for the requested update.
+func (u *FileUpdater) WriteDiff(writer io.Writer, dirPath, source, oldVersion, newVersion string) error {
+	if writer == nil {
+		writer = os.Stdout
+	}
+
+	return u.walkTerraformFiles(dirPath, func(path string) error {
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("failed to read file %s: %w", path, err)
+		}
+
+		contentStr := string(content)
+		if countOccurrences(contentStr, source, oldVersion) == 0 {
+			return nil
+		}
+
+		replacer := NewSimpleVersionReplacer(source, oldVersion, newVersion)
+		updated, err := replacer.Replace(contentStr)
+		if err != nil {
+			return fmt.Errorf("failed to replace version: %w", err)
+		}
+		if updated == contentStr {
+			return nil
+		}
+
+		diffOutput, err := report.FormatUnifiedDiff(path, contentStr, updated)
+		if err != nil {
+			return err
+		}
+		if diffOutput == "" {
+			return nil
+		}
+
+		formatted, err := report.RenderOutput(diffOutput)
+		if err != nil {
+			return err
+		}
+
+		_, err = io.WriteString(writer, formatted)
+		return err
+	})
+}
+
+// WriteDiffWithTool outputs diff through an external tool.
+func (u *FileUpdater) WriteDiffWithTool(writer io.Writer, dirPath, source, oldVersion, newVersion, tool string) error {
+	if err := report.SetOutput(tool); err != nil {
+		return err
+	}
+	return u.WriteDiff(writer, dirPath, source, oldVersion, newVersion)
+}
+
 // Count counts occurrences of a module source+version in a file without updating it
 // Returns the number of matches found
 func (u *FileUpdater) Count(filePath, source, oldVersion string) (int, error) {
@@ -71,21 +126,7 @@ func (u *FileUpdater) Count(filePath, source, oldVersion string) (int, error) {
 func (u *FileUpdater) UpdateDirectory(dirPath, source, oldVersion, newVersion string) (map[string]int, error) {
 	results := make(map[string]int)
 
-	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		// Skip directories
-		if d.IsDir() {
-			return nil
-		}
-
-		// Only process .tf files
-		if !isTerraformFile(path) {
-			return nil
-		}
-
+	err := u.walkTerraformFiles(dirPath, func(path string) error {
 		count, err := u.Update(path, source, oldVersion, newVersion)
 		if err != nil {
 			// Log error but continue processing other files
@@ -108,19 +149,7 @@ func (u *FileUpdater) UpdateDirectory(dirPath, source, oldVersion, newVersion st
 func (u *FileUpdater) CountDirectory(dirPath, source, oldVersion string) (map[string]int, error) {
 	results := make(map[string]int)
 
-	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if d.IsDir() {
-			return nil
-		}
-
-		if !isTerraformFile(path) {
-			return nil
-		}
-
+	err := u.walkTerraformFiles(dirPath, func(path string) error {
 		count, err := u.Count(path, source, oldVersion)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error scanning %s: %v\n", path, err)
@@ -135,6 +164,24 @@ func (u *FileUpdater) CountDirectory(dirPath, source, oldVersion string) (map[st
 	})
 
 	return results, err
+}
+
+func (u *FileUpdater) walkTerraformFiles(dirPath string, handler func(path string) error) error {
+	return filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+
+		if d.IsDir() {
+			return nil
+		}
+
+		if !isTerraformFile(path) {
+			return nil
+		}
+
+		return handler(path)
+	})
 }
 
 // writeAtomically writes to a file atomically using temp file + rename

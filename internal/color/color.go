@@ -58,6 +58,11 @@ func isTTY(f *os.File) bool {
 	return err == nil
 }
 
+// IsTTY exposes TTY detection for other packages.
+func IsTTY(f *os.File) bool {
+	return isTTY(f)
+}
+
 // Sprintf returns a formatted string with color codes if colors are enabled
 func (c *ColoredOutput) Sprintf(color Color, format string, args ...interface{}) string {
 	if !c.enabled {

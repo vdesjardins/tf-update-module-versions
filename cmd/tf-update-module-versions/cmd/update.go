@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -23,6 +24,8 @@ var (
 	updateConstraint     string
 	updateConstraintFile string
 	dryRun               bool
+	showDiff             bool
+	diffTool             string
 )
 
 // updateCmd represents the update command
@@ -133,9 +136,17 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	builder.AddLatestVersions(latestVersions)
 	summary := builder.Build()
 
+	var summaryWriter io.Writer = os.Stdout
+	if showDiff {
+		if err := configurePager(); err != nil {
+			return err
+		}
+		summaryWriter = pager.Writer()
+	}
+
 	// Print what will be updated
 	printer := report.NewPrinter(summary)
-	printer.Print()
+	printer.Print(summaryWriter)
 
 	// Actually perform updates
 	if dryRun {
@@ -192,6 +203,12 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 				continue
 			}
 
+			if showDiff {
+				if err := printDiffForModule(summaryWriter, fileUpdater, dirPath, mod.Source, currentVer, targetVersion); err != nil {
+					return err
+				}
+			}
+
 			var updates map[string]int
 			var err error
 			if dryRun {
@@ -225,6 +242,30 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func configurePager() error {
+	if pager != nil {
+		return nil
+	}
+
+	if err := report.SetOutput(diffTool); err != nil {
+		return err
+	}
+
+	newPager, _, err := color.StartPager()
+	if err != nil {
+		return err
+	}
+	pager = newPager
+	return nil
+}
+
+func printDiffForModule(writer io.Writer, fileUpdater *updater.FileUpdater, dirPath, source, currentVer, targetVersion string) error {
+	if diffTool != "" {
+		return fileUpdater.WriteDiffWithTool(writer, dirPath, source, currentVer, targetVersion, diffTool)
+	}
+	return fileUpdater.WriteDiff(writer, dirPath, source, currentVer, targetVersion)
 }
 
 // buildModuleFilter creates ModuleFilter from parsed flags
@@ -297,4 +338,6 @@ Example: --constraint ">=1.2.3"`)
 Mutually exclusive with --constraint`)
 
 	flags.BoolVarP(&dryRun, "dry-run", "n", false, "Show planned updates without writing files")
+	flags.BoolVar(&showDiff, "diff", false, "Show update diff output")
+	flags.StringVar(&diffTool, "diff-tool", "", "External diff command to render output (defaults to built-in diff)")
 }

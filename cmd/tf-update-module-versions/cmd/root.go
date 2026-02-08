@@ -20,6 +20,7 @@ var (
 	cacheClear = false
 	cacheStore cache.Store
 	output     *color.ColoredOutput
+	pager      *color.Pager
 )
 
 // rootCmd represents the base command when called without any subcommands
@@ -69,6 +70,9 @@ var rootCmd = &cobra.Command{
 		return nil
 	},
 	PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+		if pager != nil {
+			pager.Close()
+		}
 		// Clean up cache store resources
 		if cacheStore != nil {
 			cacheStore.Close()

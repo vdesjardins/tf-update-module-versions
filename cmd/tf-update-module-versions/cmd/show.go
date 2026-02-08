@@ -122,7 +122,7 @@ func runShow(cmd *cobra.Command, args []string) error {
 
 	// Print report
 	printer := report.NewPrinter(summary)
-	printer.Print()
+	printer.Print(nil)
 
 	return nil
 }

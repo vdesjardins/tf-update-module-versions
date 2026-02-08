@@ -71,7 +71,7 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Display applied constraints if any
-	if len(constraints) > 0 {
+	if len(constraints) > 0 && !showDiff {
 		output.Fprintf(os.Stderr, color.Cyan, "Applied constraints: %v\n", constraints)
 	}
 
@@ -82,21 +82,29 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Find all modules with versions
-	output.Fprintf(os.Stderr, color.Blue, "Finding modules in %s...\n", dirPath)
+	if !showDiff {
+		output.Fprintf(os.Stderr, color.Blue, "Finding modules in %s...\n", dirPath)
+	}
 	usages, err := finder.FindModulesWithVersions(dirPath, moduleFilter)
 	if err != nil {
 		return fmt.Errorf("failed to find modules: %w", err)
 	}
 
 	if len(usages) == 0 {
-		fmt.Printf("%s\n", output.Warning("No modules with version constraints found."))
+		if !showDiff {
+			fmt.Printf("%s\n", output.Warning("No modules with version constraints found."))
+		}
 		return nil
 	}
 
-	output.Fprintf(os.Stderr, color.Green, "Found %d module invocations\n", len(usages))
+	if !showDiff {
+		output.Fprintf(os.Stderr, color.Green, "Found %d module invocations\n", len(usages))
+	}
 
 	// Analyze sources
-	output.Fprintf(os.Stderr, color.Blue, "Analyzing module sources...\n")
+	if !showDiff {
+		output.Fprintf(os.Stderr, color.Blue, "Analyzing module sources...\n")
+	}
 	resolver := source.NewResolver()
 	sources := make(map[string]*source.Source)
 	supportedSources := []*source.Source{}
@@ -105,7 +113,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 		if _, exists := sources[usage.Usage.Source]; !exists {
 			src, err := resolver.Resolve(usage.Usage.Source)
 			if err != nil {
-				output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to parse source %s: %v\n", usage.Usage.Source, err)
+				if !showDiff {
+					output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to parse source %s: %v\n", usage.Usage.Source, err)
+				}
 				continue
 			}
 			sources[usage.Usage.Source] = src
@@ -117,7 +127,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Fetch latest versions
-	output.Fprintf(os.Stderr, color.Blue, "Fetching latest versions from registries...\n")
+	if !showDiff {
+		output.Fprintf(os.Stderr, color.Blue, "Fetching latest versions from registries...\n")
+	}
 	var fetcher *registry.VersionFetcher
 	if cacheStore != nil {
 		// Use version fetcher with cache
@@ -145,14 +157,18 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Print what will be updated
-	printer := report.NewPrinter(summary)
-	printer.Print(summaryWriter)
+	if !showDiff {
+		printer := report.NewPrinter(summary)
+		printer.Print(summaryWriter)
+	}
 
 	// Actually perform updates
-	if dryRun {
-		output.Fprintf(os.Stderr, color.Blue, "\nDry-run: planned updates...\n")
-	} else {
-		output.Fprintf(os.Stderr, color.Blue, "\nApplying updates...\n")
+	if !showDiff {
+		if dryRun {
+			output.Fprintf(os.Stderr, color.Blue, "\nDry-run: planned updates...\n")
+		} else {
+			output.Fprintf(os.Stderr, color.Blue, "\nApplying updates...\n")
+		}
 	}
 	fileUpdater := updater.NewFileUpdater()
 
@@ -189,7 +205,9 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 						constraints,
 					)
 					if err != nil {
-						output.Fprintf(os.Stderr, color.BoldYellow, "Warning: could not select version for %s: %v\n", mod.Source, err)
+						if !showDiff {
+							output.Fprintf(os.Stderr, color.BoldYellow, "Warning: could not select version for %s: %v\n", mod.Source, err)
+						}
 						continue
 					}
 					targetVersion = selectedVersion
@@ -217,28 +235,34 @@ func runUpdate(cmd *cobra.Command, args []string) error {
 				updates, err = fileUpdater.UpdateDirectory(dirPath, mod.Source, currentVer, targetVersion)
 			}
 			if err != nil {
-				output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to update %s: %v\n", mod.Source, err)
+				if !showDiff {
+					output.Fprintf(os.Stderr, color.BoldYellow, "Warning: failed to update %s: %v\n", mod.Source, err)
+				}
 				continue
 			}
 
 			for file, count := range updates {
-				if dryRun {
-					fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Info("•"), file, mod.Source, currentVer, targetVersion, count)
-				} else {
-					fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count)
+				if !showDiff {
+					if dryRun {
+						fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Info("•"), file, mod.Source, currentVer, targetVersion, count)
+					} else {
+						fmt.Printf("%s %s: %s %s → %s (%d changes)\n", output.Success("✓"), file, mod.Source, currentVer, targetVersion, count)
+					}
 				}
 				updatesApplied += count
 			}
 		}
 	}
 
-	if dryRun {
-		fmt.Printf("\nDry-run: planned updates\n")
-		fmt.Printf("Files Planned: %s\n", output.Status("%d", updatesApplied))
-		fmt.Printf("Total Planned Changes: %s\n\n", output.Status("%d", updatesApplied))
-	} else {
-		fmt.Printf("\nFiles Updated: %s\n", output.Status("%d", updatesApplied))
-		fmt.Printf("Total Changes: %s\n\n", output.Status("%d", updatesApplied))
+	if !showDiff {
+		if dryRun {
+			fmt.Printf("\nDry-run: planned updates\n")
+			fmt.Printf("Files Planned: %s\n", output.Status("%d", updatesApplied))
+			fmt.Printf("Total Planned Changes: %s\n\n", output.Status("%d", updatesApplied))
+		} else {
+			fmt.Printf("\nFiles Updated: %s\n", output.Status("%d", updatesApplied))
+			fmt.Printf("Total Changes: %s\n\n", output.Status("%d", updatesApplied))
+		}
 	}
 
 	return nil

@@ -35,7 +35,7 @@ func (p *Printer) Print() {
 
 	// Detailed reports for supported modules
 	if len(p.summary.Modules) > 0 {
-		fmt.Println(p.color.Sprintf(color.BoldBlue, "Supported Modules"))
+		fmt.Println(p.color.Sprintf(color.BoldBlue, "\nSupported Modules"))
 		fmt.Println(p.color.Sprintf(color.Blue, "─────────────────"))
 		for _, mod := range p.summary.Modules {
 			p.printModuleReport(&mod)
@@ -44,7 +44,7 @@ func (p *Printer) Print() {
 
 	// Unsupported modules
 	if len(p.summary.UnsupportedModules) > 0 {
-		fmt.Println(p.color.Sprintf(color.BoldYellow, "Unsupported Modules"))
+		fmt.Println(p.color.Sprintf(color.BoldYellow, "\nUnsupported Modules"))
 		fmt.Println(p.color.Sprintf(color.Yellow, "───────────────────"))
 		for _, unsup := range p.summary.UnsupportedModules {
 			fmt.Printf("\n%s\n", p.color.Error("✗ %s (%s)", unsup.Source, unsup.Type.String()))
@@ -55,7 +55,7 @@ func (p *Printer) Print() {
 	}
 
 	// Summary stats
-	fmt.Println(p.color.Sprintf(color.BoldBlue, "Summary"))
+	fmt.Println(p.color.Sprintf(color.BoldBlue, "\nSummary"))
 	fmt.Println(p.color.Sprintf(color.Blue, "───────"))
 	fmt.Printf("  Total Module Invocations:           %d\n", p.summary.TotalUsages)
 	fmt.Printf("  Module Invocations to Update:       %d\n", p.summary.TotalUpdated)

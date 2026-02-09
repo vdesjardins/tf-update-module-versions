@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -32,14 +31,21 @@ var rootCmd = &cobra.Command{
 		// Initialize colored output
 		output = color.New()
 
+		cfg, _, err := loadConfigFile()
+		if err != nil {
+			return fmt.Errorf("failed to load config: %w", err)
+		}
+		if err := applyConfigDefaults(cmd, cfg); err != nil {
+			return err
+		}
+
 		// Initialize cache if cache operations are needed
 		if cacheDir == "" {
-			// Default to ~/.cache/terraform-module-versions
-			home, err := os.UserHomeDir()
+			defaultDir, err := defaultCacheDir()
 			if err != nil {
-				return fmt.Errorf("failed to determine home directory: %w", err)
+				return err
 			}
-			cacheDir = filepath.Join(home, ".cache", "terraform-module-versions")
+			cacheDir = defaultDir
 		}
 
 		// Create cache directory if it doesn't exist
